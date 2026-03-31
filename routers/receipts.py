@@ -130,14 +130,19 @@ def normalize_image_bytes(contents: bytes) -> tuple[bytes, str]:
             elif save_format in {"PNG", "WEBP"} and normalized.mode == "P":
                 normalized = normalized.convert("RGBA")
 
+            # 長辺1600px以内にリサイズ（Gemini処理高速化 & DB節約）
+            max_px = 1600
+            if max(normalized.width, normalized.height) > max_px:
+                normalized.thumbnail((max_px, max_px), Image.LANCZOS)
+
             output = io.BytesIO()
             save_kwargs: dict = {}
             if save_format == "JPEG":
-                save_kwargs = {"quality": 90, "optimize": True}
+                save_kwargs = {"quality": 85, "optimize": True}
             elif save_format == "PNG":
                 save_kwargs = {"optimize": True}
             elif save_format == "WEBP":
-                save_kwargs = {"quality": 90, "method": 6}
+                save_kwargs = {"quality": 85, "method": 6}
 
             normalized.save(output, format=save_format, **save_kwargs)
             return output.getvalue(), ALLOWED_IMAGE_FORMATS[source_format]

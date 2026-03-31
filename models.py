@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Date, Boolean, LargeBinary
+from sqlalchemy.orm import deferred
 from datetime import datetime
 from database import Base
 
@@ -13,5 +14,5 @@ class Receipt(Base):
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     receipt_date = Column(Date, nullable=True)
     is_expense = Column(Boolean, default=True, nullable=False, server_default="true")
-    image_data = Column(LargeBinary, nullable=True)
+    image_data = deferred(Column(LargeBinary, nullable=True))  # 明示アクセス時のみ読み込む
     image_content_type = Column(String(50), nullable=True)
