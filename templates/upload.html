@@ -41,6 +41,12 @@
     <main class="max-w-2xl mx-auto px-4 py-12">
         <h1 class="text-2xl font-bold text-gray-800 mb-8">レシート画像をアップロード</h1>
 
+        {% if error %}
+        <div class="mb-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            {{ error }}
+        </div>
+        {% endif %}
+
         <form method="post" enctype="multipart/form-data" id="uploadForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <!-- ドロップエリア -->

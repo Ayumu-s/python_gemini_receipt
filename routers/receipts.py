@@ -16,6 +16,8 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from openpyxl.styles import Alignment, Font, PatternFill
 from PIL import Image, ImageOps, UnidentifiedImageError
+import pillow_heif
+pillow_heif.register_heif_opener()
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
@@ -37,6 +39,7 @@ ALLOWED_IMAGE_FORMATS = {
     "JPEG": ".jpg",
     "PNG": ".png",
     "WEBP": ".webp",
+    "HEIF": ".jpg",  # iOSのHEIC/HEIFはJPEGに変換して保存
 }
 APP_USERNAME = os.getenv("APP_USERNAME")
 APP_PASSWORD = os.getenv("APP_PASSWORD")
@@ -118,21 +121,25 @@ def normalize_image_bytes(contents: bytes) -> tuple[bytes, str]:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JPEG / PNG / WEBP 画像のみアップロードできます。")
 
             normalized = ImageOps.exif_transpose(image)
-            if source_format == "JPEG" and normalized.mode not in ("RGB", "L"):
+
+            # HEIF/HEICはJPEGに変換
+            save_format = "JPEG" if source_format == "HEIF" else source_format
+
+            if save_format == "JPEG" and normalized.mode not in ("RGB", "L"):
                 normalized = normalized.convert("RGB")
-            elif source_format in {"PNG", "WEBP"} and normalized.mode == "P":
+            elif save_format in {"PNG", "WEBP"} and normalized.mode == "P":
                 normalized = normalized.convert("RGBA")
 
             output = io.BytesIO()
             save_kwargs: dict = {}
-            if source_format == "JPEG":
+            if save_format == "JPEG":
                 save_kwargs = {"quality": 90, "optimize": True}
-            elif source_format == "PNG":
+            elif save_format == "PNG":
                 save_kwargs = {"optimize": True}
-            elif source_format == "WEBP":
+            elif save_format == "WEBP":
                 save_kwargs = {"quality": 90, "method": 6}
 
-            normalized.save(output, format=source_format, **save_kwargs)
+            normalized.save(output, format=save_format, **save_kwargs)
             return output.getvalue(), ALLOWED_IMAGE_FORMATS[source_format]
     except UnidentifiedImageError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="画像ファイルとして認識できませんでした。") from exc
@@ -353,10 +360,16 @@ async def upload(
     if len(files) > MAX_FILES_PER_UPLOAD:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"同時アップロードは {MAX_FILES_PER_UPLOAD} 件までです。")
 
+    errors = []
     for file in files:
         original_filename = safe_filename(file.filename or "upload")
         contents = await file.read()
-        normalized_bytes, extension = normalize_image_bytes(contents)
+        try:
+            normalized_bytes, extension = normalize_image_bytes(contents)
+        except HTTPException as exc:
+            errors.append(f"{original_filename}: {exc.detail}")
+            continue
+
         stored_filename = make_stored_filename(extension)
         mime = mimetypes.guess_type(f"x{extension}")[0] or "application/octet-stream"
 
@@ -375,6 +388,17 @@ async def upload(
                 image_data=normalized_bytes,
                 image_content_type=mime,
             )
+        )
+
+    if errors and not db.new:
+        return render_template(
+            request, "upload.html",
+            {
+                "error": "、".join(errors),
+                "max_files_per_upload": MAX_FILES_PER_UPLOAD,
+                "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
+            },
+            status_code=400,
         )
 
     db.commit()
