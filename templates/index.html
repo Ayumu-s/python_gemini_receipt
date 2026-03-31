@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>経費管理Webアプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- ナビゲーション -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <span class="text-lg font-bold text-gray-800">経費管理アプリ</span>
+            <button id="navToggle" class="md:hidden p-1 text-gray-500 hover:text-gray-700" aria-label="メニュー">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+            <div class="hidden md:flex items-center gap-4 text-sm">
+                <a href="/upload" class="text-blue-600 hover:text-blue-800 font-medium">アップロード</a>
+                <a href="/receipts" class="text-blue-600 hover:text-blue-800 font-medium">一覧</a>
+                <a href="/summary" class="text-blue-600 hover:text-blue-800 font-medium">集計</a>
+                <form method="post" action="/logout" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="text-gray-500 hover:text-red-600 font-medium">ログアウト</button>
+                </form>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden border-t border-gray-100 px-4 py-3 space-y-1 md:hidden">
+            <a href="/upload" class="block py-2 text-sm text-blue-600 hover:text-blue-800 font-medium">アップロード</a>
+            <a href="/receipts" class="block py-2 text-sm text-blue-600 hover:text-blue-800 font-medium">一覧</a>
+            <a href="/summary" class="block py-2 text-sm text-blue-600 hover:text-blue-800 font-medium">集計</a>
+            <form method="post" action="/logout" class="border-t border-gray-100 pt-2 mt-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="block w-full text-left py-2 text-sm text-gray-500 hover:text-red-600 font-medium">ログアウト</button>
+            </form>
+        </div>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-4xl mx-auto px-4 py-16">
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-800 mb-3">経費管理Webアプリ</h1>
+            <p class="text-gray-500">レシート画像をアップロードして、AIが自動で内容を解析します</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- アップロードカード -->
+            <a href="/upload" class="group bg-white rounded-2xl shadow-sm border border-gray-200 p-8 hover:shadow-md hover:border-blue-300 transition-all">
+                <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">レシートをアップロード</h2>
+                <p class="text-gray-500 text-sm">画像ファイルを選択してAIに解析させます。複数枚同時対応。</p>
+            </a>
+
+            <!-- 一覧カード -->
+            <a href="/receipts" class="group bg-white rounded-2xl shadow-sm border border-gray-200 p-8 hover:shadow-md hover:border-green-300 transition-all">
+                <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">アップロード済み一覧</h2>
+                <p class="text-gray-500 text-sm">解析済みレシートの内容を一覧で確認できます。</p>
+            </a>
+        </div>
+    </main>
+
+    <script>
+        document.getElementById('navToggle')?.addEventListener('click', () => {
+            document.getElementById('mobileMenu').classList.toggle('hidden');
+        });
+    </script>
+</body>
+</html>

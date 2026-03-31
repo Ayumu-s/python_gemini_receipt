@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レシートアップロード</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- ナビゲーション -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="text-lg font-bold text-gray-800 hover:text-blue-600">経費管理アプリ</a>
+            <button id="navToggle" class="md:hidden p-1 text-gray-500 hover:text-gray-700" aria-label="メニュー">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+            <div class="hidden md:flex items-center gap-4 text-sm">
+                <a href="/upload" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-0.5">アップロード</a>
+                <a href="/receipts" class="text-gray-500 hover:text-blue-600 font-medium">一覧</a>
+                <a href="/summary" class="text-gray-500 hover:text-blue-600 font-medium">集計</a>
+                <form method="post" action="/logout" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="text-gray-500 hover:text-red-600 font-medium">ログアウト</button>
+                </form>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden border-t border-gray-100 px-4 py-3 space-y-1 md:hidden">
+            <a href="/upload" class="block py-2 text-sm text-blue-600 font-semibold">アップロード</a>
+            <a href="/receipts" class="block py-2 text-sm text-gray-500 hover:text-blue-600 font-medium">一覧</a>
+            <a href="/summary" class="block py-2 text-sm text-gray-500 hover:text-blue-600 font-medium">集計</a>
+            <form method="post" action="/logout" class="border-t border-gray-100 pt-2 mt-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="block w-full text-left py-2 text-sm text-gray-500 hover:text-red-600 font-medium">ログアウト</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="max-w-2xl mx-auto px-4 py-12">
+        <h1 class="text-2xl font-bold text-gray-800 mb-8">レシート画像をアップロード</h1>
+
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <!-- ドロップエリア -->
+            <label for="fileInput"
+                class="block border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
+                id="dropZone">
+                <div class="flex flex-col items-center gap-3">
+                    <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                    <p class="text-gray-600 font-medium">クリックして画像を選択</p>
+                    <p class="text-gray-400 text-sm">複数枚同時選択可能 · JPG, PNG, WEBP</p>
+                    <p class="text-gray-400 text-xs">最大 {{ max_files_per_upload }} 件 / 1ファイル {{ max_upload_mb }}MB まで</p>
+                </div>
+                <input type="file" id="fileInput" name="files" accept="image/*" multiple required class="hidden">
+            </label>
+
+            <!-- 選択ファイル表示 -->
+            <div id="fileList" class="mt-4 space-y-2 hidden"></div>
+
+            <!-- 送信ボタン -->
+            <button type="submit" id="submitBtn"
+                class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                AIで解析する
+            </button>
+        </form>
+
+        <!-- ローディング表示 -->
+        <div id="loading" class="hidden mt-6 text-center">
+            <div class="inline-flex items-center gap-3 bg-blue-50 text-blue-700 px-6 py-3 rounded-xl">
+                <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                AI解析中... しばらくお待ちください
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.getElementById('navToggle')?.addEventListener('click', () => {
+            document.getElementById('mobileMenu').classList.toggle('hidden');
+        });
+
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const uploadForm = document.getElementById('uploadForm');
+
+        fileInput.addEventListener('change', () => {
+            const files = fileInput.files;
+            if (files.length === 0) { fileList.classList.add('hidden'); return; }
+
+            fileList.classList.remove('hidden');
+            fileList.innerHTML = '';
+            Array.from(files).forEach(f => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-700';
+                div.innerHTML = `<svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>${f.name}</span>`;
+                fileList.appendChild(div);
+            });
+        });
+
+        uploadForm.addEventListener('submit', () => {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('hidden');
+            loading.classList.remove('hidden');
+        });
+    </script>
+
+</body>
+</html>

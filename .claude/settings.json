@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/pip install:*)",
+      "Bash(venv/Scripts/python -c \"import fastapi, uvicorn, sqlalchemy, psycopg2, dotenv, multipart; print\\(''全パッケージ OK''\\)\")"
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100">
+    <main class="min-h-screen flex items-center justify-center px-4">
+        <div class="w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-sm p-8">
+            <p class="text-sm font-semibold text-blue-600 mb-2">Private Access</p>
+            <h1 class="text-3xl font-bold text-slate-900">経費管理アプリ</h1>
+            <p class="text-sm text-slate-500 mt-2">公開前の最低限保護として、共有アカウントでログインしてから利用します。</p>
+
+            {% if error %}
+            <div class="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="post" action="/login" class="mt-6 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <div>
+                    <label for="username" class="block text-sm font-medium text-slate-700 mb-1">ユーザー名</label>
+                    <input id="username" name="username" type="text" required
+                        class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-700 mb-1">パスワード</label>
+                    <input id="password" name="password" type="password" required
+                        class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                </div>
+
+                <button type="submit"
+                    class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                    ログイン
+                </button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

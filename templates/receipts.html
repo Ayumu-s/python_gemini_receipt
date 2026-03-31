@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アップロード済みレシート一覧</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="text-lg font-bold text-gray-800 hover:text-blue-600">経費管理アプリ</a>
+            <button id="navToggle" class="md:hidden p-1 text-gray-500 hover:text-gray-700" aria-label="メニュー">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+            <div class="hidden md:flex items-center gap-4 text-sm">
+                <a href="/upload" class="text-gray-500 hover:text-blue-600 font-medium">アップロード</a>
+                <a href="/receipts" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-0.5">一覧</a>
+                <a href="/summary" class="text-gray-500 hover:text-blue-600 font-medium">集計</a>
+                <form method="post" action="/logout" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="text-gray-500 hover:text-red-600 font-medium">ログアウト</button>
+                </form>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden border-t border-gray-100 px-4 py-3 space-y-1 md:hidden">
+            <a href="/upload" class="block py-2 text-sm text-gray-500 hover:text-blue-600 font-medium">アップロード</a>
+            <a href="/receipts" class="block py-2 text-sm text-blue-600 font-semibold">一覧</a>
+            <a href="/summary" class="block py-2 text-sm text-gray-500 hover:text-blue-600 font-medium">集計</a>
+            <form method="post" action="/logout" class="border-t border-gray-100 pt-2 mt-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="block w-full text-left py-2 text-sm text-gray-500 hover:text-red-600 font-medium">ログアウト</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">レシート一覧</h1>
+            <div class="flex gap-2">
+                <!-- エクスポートボタン -->
+                <a href="/receipts/export{% if selected_year or selected_month %}?{% endif %}{% if selected_year %}year={{ selected_year }}{% endif %}{% if selected_month %}{% if selected_year %}&{% endif %}month={{ selected_month }}{% endif %}"
+                    class="flex items-center gap-1.5 bg-white border border-gray-200 hover:border-green-400 text-gray-600 hover:text-green-700 text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    ZIP
+                </a>
+                <a href="/upload"
+                    class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    新規追加
+                </a>
+            </div>
+        </div>
+
+        <!-- フィルターパネル -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-4 space-y-4">
+            {% set fp = "" %}
+            {% if selected_year %}{% set fp = fp ~ "&year=" ~ selected_year %}{% endif %}
+            {% if selected_month %}{% set fp = fp ~ "&month=" ~ selected_month %}{% endif %}
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-semibold text-gray-400 w-12 shrink-0">順序</span>
+                <a href="/receipts?sort=uploaded_at{{ fp }}"
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-gray-800 text-white' if sort != 'receipt_date' else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                    アップロード順
+                </a>
+                <a href="/receipts?sort=receipt_date{{ fp }}"
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-gray-800 text-white' if sort == 'receipt_date' else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                    レシート日付順
+                </a>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap border-t border-gray-100 pt-4">
+                <span class="text-xs font-semibold text-gray-400 w-12 shrink-0">年</span>
+                <a href="/receipts?sort={{ sort }}"
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-blue-600 text-white' if not selected_year else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                    すべて
+                </a>
+                {% for y in available_years %}
+                <a href="/receipts?sort={{ sort }}&year={{ y }}"
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-blue-600 text-white' if selected_year == y else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                    {{ y }}年
+                </a>
+                {% endfor %}
+                {% if not available_years %}
+                <span class="text-xs text-gray-400">（レシート日付が登録されたデータがありません）</span>
+                {% endif %}
+            </div>
+
+            {% if selected_year %}
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-semibold text-gray-400 w-12 shrink-0">月</span>
+                <a href="/receipts?sort={{ sort }}&year={{ selected_year }}"
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-blue-600 text-white' if not selected_month else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                    すべて
+                </a>
+                {% for m in range(1, 13) %}
+                <a href="/receipts?sort={{ sort }}&year={{ selected_year }}&month={{ m }}"
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {{ 'bg-blue-600 text-white' if selected_month == m else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
+                    {{ m }}月
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 合計サマリー -->
+        {% if receipts and selected_year %}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4 mb-4 flex items-center justify-between">
+            <span class="text-sm text-gray-500">
+                {{ selected_year }}年{% if selected_month %}{{ selected_month }}月{% endif %}の経費合計
+            </span>
+            <span class="text-xl font-bold text-gray-800">{{ year_total }}</span>
+        </div>
+        {% endif %}
+
+        <!-- 一括操作バー -->
+        <div id="bulkBar" class="hidden mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <span id="selectedCount" class="text-sm text-red-700 font-medium">0件選択中</span>
+            <button onclick="submitDelete()"
+                class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors">
+                選択したレシートを削除
+            </button>
+        </div>
+        <form id="deleteForm" method="post" action="/receipts/delete" data-csrf-token="{{ csrf_token }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        </form>
+
+        {% if receipts %}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[640px]">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-200">
+                        <th class="px-4 py-3 w-8">
+                            <input type="checkbox" id="selectAll" class="w-4 h-4 rounded text-blue-600 cursor-pointer">
+                        </th>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-600">レシート日付</th>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-600">店舗名</th>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-600">勘定科目</th>
+                        <th class="text-right px-4 py-3 font-semibold text-gray-600">合計金額</th>
+                        <th class="text-center px-3 py-3 font-semibold text-gray-600">経費</th>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-600 hidden md:table-cell">アップロード日時</th>
+                        <th class="px-4 py-3 text-center font-semibold text-gray-600">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+
+                {% set ns = namespace(current_group='') %}
+                {% for item in receipts %}
+
+                    {% if item.month_group != ns.current_group %}
+                    {% set ns.current_group = item.month_group %}
+                    <tr class="bg-blue-50 border-y border-blue-100">
+                        <td colspan="4" class="px-5 py-2 text-sm font-bold text-blue-700">
+                            {{ item.month_group }}
+                        </td>
+                        <td colspan="4" class="px-4 py-2 text-sm font-bold text-blue-700 text-right">
+                            {{ month_totals.get(item.month_group, "－") }}
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr class="hover:bg-gray-50 transition-colors {{ 'opacity-50' if not item.is_expense else '' }}">
+                        <td class="px-4 py-3" onclick="event.stopPropagation()">
+                            <input type="checkbox" class="row-check w-4 h-4 rounded text-blue-600 cursor-pointer" value="{{ item.id }}">
+                        </td>
+                        <td class="px-4 py-3 text-gray-800 font-medium whitespace-nowrap cursor-pointer" onclick="toggleDetail({{ item.id }})">
+                            {{ item.date_str }}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700 cursor-pointer" onclick="toggleDetail({{ item.id }})">
+                            {{ item.store }}
+                        </td>
+                        <td class="px-4 py-3 cursor-pointer" onclick="toggleDetail({{ item.id }})">
+                            <span class="bg-blue-50 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                                {{ item.category }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-right font-semibold whitespace-nowrap cursor-pointer {{ 'text-gray-400 line-through' if not item.is_expense else 'text-gray-800' }}" onclick="toggleDetail({{ item.id }})">
+                            {{ item.total }}
+                        </td>
+                        <td class="px-3 py-3 text-center" onclick="event.stopPropagation()">
+                            <form method="post" action="/receipts/{{ item.id }}/toggle-expense" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit"
+                                    title="{{ '経費対象（クリックで除外）' if item.is_expense else '経費対象外（クリックで対象に戻す）' }}"
+                                    class="w-7 h-7 rounded-full flex items-center justify-center transition-colors mx-auto {{ 'bg-green-100 text-green-600 hover:bg-green-200' if item.is_expense else 'bg-gray-100 text-gray-400 hover:bg-gray-200' }}">
+                                    {% if item.is_expense %}
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    {% else %}
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                    {% endif %}
+                                </button>
+                            </form>
+                        </td>
+                        <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell whitespace-nowrap cursor-pointer" onclick="toggleDetail({{ item.id }})">
+                            {{ item.uploaded_at.strftime('%Y/%m/%d %H:%M') }}
+                        </td>
+                        <td class="px-4 py-3 text-center whitespace-nowrap" onclick="event.stopPropagation()">
+                            <a href="/receipts/{{ item.id }}/edit"
+                                class="inline-block text-xs text-gray-500 hover:text-blue-600 border border-gray-200 hover:border-blue-300 px-2.5 py-1 rounded-lg transition-colors">
+                                編集
+                            </a>
+                            <button onclick="toggleDetail({{ item.id }})" class="ml-1 text-gray-400 hover:text-gray-600 transition-colors">
+                                <svg id="arrow-{{ item.id }}" class="w-4 h-4 inline-block transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+
+                    <tr id="detail-{{ item.id }}" class="hidden bg-gray-50">
+                        <td colspan="8" class="px-6 py-4">
+                            <div class="flex flex-col md:flex-row gap-4">
+                                <div class="flex-shrink-0 cursor-pointer" onclick="openImage('/receipts/{{ item.id }}/image')">
+                                    <img src="/receipts/{{ item.id }}/image"
+                                        alt="{{ item.filename }}"
+                                        class="h-40 w-auto object-contain rounded-lg border border-gray-200 shadow-sm hover:opacity-90 transition-opacity">
+                                    <p class="text-xs text-center text-gray-400 mt-1">クリックで拡大</p>
+                                </div>
+                                <pre class="flex-1 text-xs text-gray-700 whitespace-pre-wrap font-sans bg-white border border-gray-200 rounded-xl p-4 leading-relaxed overflow-auto">{{ item.result }}</pre>
+                            </div>
+                        </td>
+                    </tr>
+
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-3 text-right">{{ receipts | length }} 件</p>
+
+        {% else %}
+        <div class="text-center py-20 text-gray-400">
+            <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <p class="text-lg font-medium">該当するレシートがありません</p>
+            <a href="/upload" class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
+                アップロードする
+            </a>
+        </div>
+        {% endif %}
+
+    </main>
+
+    <!-- 画像モーダル -->
+    <div id="imageModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="closeImage()">
+        <div class="relative max-w-4xl max-h-full" onclick="event.stopPropagation()">
+            <img id="modalImage" src="" alt="レシート拡大" class="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl">
+            <button onclick="closeImage()"
+                class="absolute -top-3 -right-3 bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-md text-gray-600 hover:text-gray-900">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('navToggle')?.addEventListener('click', () => {
+            document.getElementById('mobileMenu').classList.toggle('hidden');
+        });
+
+        function toggleDetail(id) {
+            const row = document.getElementById('detail-' + id);
+            const arrow = document.getElementById('arrow-' + id);
+            row.classList.toggle('hidden');
+            arrow.style.transform = row.classList.contains('hidden') ? '' : 'rotate(180deg)';
+        }
+        function openImage(src) {
+            document.getElementById('modalImage').src = src;
+            document.getElementById('imageModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeImage() {
+            document.getElementById('imageModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeImage(); });
+
+        const bulkBar = document.getElementById('bulkBar');
+        const selectedCount = document.getElementById('selectedCount');
+        function updateBulkBar() {
+            const checked = document.querySelectorAll('.row-check:checked');
+            bulkBar.classList.toggle('hidden', checked.length === 0);
+            selectedCount.textContent = checked.length + '件選択中';
+        }
+        document.getElementById('selectAll')?.addEventListener('change', function () {
+            document.querySelectorAll('.row-check').forEach(cb => cb.checked = this.checked);
+            updateBulkBar();
+        });
+        document.querySelectorAll('.row-check').forEach(cb => cb.addEventListener('change', updateBulkBar));
+        function submitDelete() {
+            const checked = document.querySelectorAll('.row-check:checked');
+            if (checked.length === 0) return;
+            if (!confirm(checked.length + '件のレシートを削除しますか？この操作は取り消せません。')) return;
+            const form = document.getElementById('deleteForm');
+            form.innerHTML = '';
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = 'csrf_token';
+            csrf.value = form.dataset.csrfToken;
+            form.appendChild(csrf);
+            checked.forEach(cb => {
+                const input = document.createElement('input');
+                input.type = 'hidden'; input.name = 'ids'; input.value = cb.value;
+                form.appendChild(input);
+            });
+            form.submit();
+        }
+    </script>
+
+</body>
+</html>
