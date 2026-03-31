@@ -35,12 +35,11 @@ MAX_FILES_PER_UPLOAD = int(os.getenv("MAX_FILES_PER_UPLOAD", "10"))
 LOGIN_RATE_LIMIT_WINDOW = 10 * 60
 UPLOAD_RATE_LIMIT_WINDOW = 10 * 60
 RATE_LIMIT_BUCKETS: dict[tuple[str, str], list[float]] = {}
-ALLOWED_IMAGE_FORMATS = {
-    "JPEG": ".jpg",
-    "PNG": ".png",
-    "WEBP": ".webp",
-    "HEIF": ".jpg",  # iOSのHEIC/HEIFはJPEGに変換して保存
-}
+# JPEGとして保存できるフォーマット（iOSのMPO・HEIFなど含む）
+JPEG_COMPATIBLE_FORMATS = {"JPEG", "MPO", "HEIF", "HEIC", "TIFF", "BMP", "GIF"}
+# PNG/WEBPはそのまま保存
+PNG_FORMATS = {"PNG"}
+WEBP_FORMATS = {"WEBP"}
 APP_USERNAME = os.getenv("APP_USERNAME")
 APP_PASSWORD = os.getenv("APP_PASSWORD")
 
@@ -117,13 +116,17 @@ def normalize_image_bytes(contents: bytes) -> tuple[bytes, str]:
     try:
         with Image.open(io.BytesIO(contents)) as image:
             source_format = (image.format or "").upper()
-            if source_format not in ALLOWED_IMAGE_FORMATS:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JPEG / PNG / WEBP 画像のみアップロードできます。")
+
+            # Pillowで開けた画像はすべて受け入れ、形式に応じてJPEG/PNG/WEBPに変換
+            if source_format in PNG_FORMATS:
+                save_format, extension = "PNG", ".png"
+            elif source_format in WEBP_FORMATS:
+                save_format, extension = "WEBP", ".webp"
+            else:
+                # JPEG互換（MPO, HEIF, BMP, TIFFなどiOS/Android各種）→ JPEG
+                save_format, extension = "JPEG", ".jpg"
 
             normalized = ImageOps.exif_transpose(image)
-
-            # HEIF/HEICはJPEGに変換
-            save_format = "JPEG" if source_format == "HEIF" else source_format
 
             if save_format == "JPEG" and normalized.mode not in ("RGB", "L"):
                 normalized = normalized.convert("RGB")
@@ -131,23 +134,20 @@ def normalize_image_bytes(contents: bytes) -> tuple[bytes, str]:
                 normalized = normalized.convert("RGBA")
 
             # 長辺1600px以内にリサイズ（Gemini処理高速化 & DB節約）
-            max_px = 1600
-            if max(normalized.width, normalized.height) > max_px:
-                normalized.thumbnail((max_px, max_px), Image.LANCZOS)
+            if max(normalized.width, normalized.height) > 1600:
+                normalized.thumbnail((1600, 1600), Image.LANCZOS)
 
             output = io.BytesIO()
-            save_kwargs: dict = {}
             if save_format == "JPEG":
-                save_kwargs = {"quality": 85, "optimize": True}
+                normalized.save(output, format="JPEG", quality=85, optimize=True)
             elif save_format == "PNG":
-                save_kwargs = {"optimize": True}
+                normalized.save(output, format="PNG", optimize=True)
             elif save_format == "WEBP":
-                save_kwargs = {"quality": 85, "method": 6}
+                normalized.save(output, format="WEBP", quality=85, method=6)
 
-            normalized.save(output, format=save_format, **save_kwargs)
-            return output.getvalue(), ALLOWED_IMAGE_FORMATS[source_format]
+            return output.getvalue(), extension
     except UnidentifiedImageError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="画像ファイルとして認識できませんでした。") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="画像ファイルとして認識できませんでした。別の画像をお試しください。") from exc
 
 
 def make_stored_filename(extension: str) -> str:
