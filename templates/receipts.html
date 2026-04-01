@@ -206,7 +206,7 @@
                             </form>
                         </td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell whitespace-nowrap cursor-pointer" onclick="toggleDetail({{ item.id }})">
-                            {{ item.uploaded_at.strftime('%Y/%m/%d %H:%M') }}
+                            {{ item.uploaded_at | jst }}
                         </td>
                         <td class="px-4 py-3 text-center whitespace-nowrap" onclick="event.stopPropagation()">
                             <a href="/receipts/{{ item.id }}/edit"

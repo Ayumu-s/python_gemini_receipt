@@ -7,7 +7,7 @@ import secrets
 import time
 import uuid
 import zipfile
-from datetime import date
+from datetime import date, timedelta, timezone
 from urllib.parse import quote
 
 import openpyxl
@@ -25,8 +25,19 @@ from database import get_db
 from models import Receipt
 from services.gemini import analyze_receipt
 
+JST = timezone(timedelta(hours=9))
+
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+
+
+def _to_jst(dt) -> str:
+    if dt is None:
+        return ""
+    return dt.replace(tzinfo=timezone.utc).astimezone(JST).strftime("%Y/%m/%d %H:%M")
+
+
+templates.env.filters["jst"] = _to_jst
 
 PRIVATE_UPLOAD_FOLDER = "storage/uploads"
 LEGACY_UPLOAD_FOLDER = "static/uploads"
@@ -542,7 +553,7 @@ async def export_receipts(
             "○" if receipt["is_expense"] else "×",
             receipt["filename"],
             receipt["image_relative_path"],
-            receipt["uploaded_at"].strftime("%Y/%m/%d %H:%M"),
+            _to_jst(receipt["uploaded_at"]),
         ]
 
     label = f"_{year}年" if year else "_全期間"
